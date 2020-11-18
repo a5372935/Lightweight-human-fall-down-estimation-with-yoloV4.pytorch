@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-
+import random
 from modules.keypoints import BODY_PARTS_KPT_IDS, BODY_PARTS_PAF_IDS
 from modules.one_euro_filter import OneEuroFilter
 
@@ -16,7 +16,7 @@ class Pose:
                       dtype=np.float32) / 10.0
     vars = (sigmas * 2) ** 2
     last_id = -1
-    color = [0, 224, 255]
+    color = [255, 255, 0]
 
     def __init__(self, keypoints, confidence):
         super().__init__()
@@ -52,14 +52,17 @@ class Pose:
             global_kpt_a_id = self.keypoints[kpt_a_id, 0]
             if global_kpt_a_id != -1:
                 x_a, y_a = self.keypoints[kpt_a_id]
-                cv2.circle(img, (int(x_a), int(y_a)), 3, Pose.color, -1)
+                cv2.circle(img, (int(x_a), int(y_a)), 5, Pose.color, -1)
             kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
             global_kpt_b_id = self.keypoints[kpt_b_id, 0]
             if global_kpt_b_id != -1:
                 x_b, y_b = self.keypoints[kpt_b_id]
-                cv2.circle(img, (int(x_b), int(y_b)), 3, Pose.color, -1)
+                # print("kpt_b_id = " + str(Pose.kpt_names[kpt_b_id]) + "; " + str(int(x_b)) + ", " + str(int(y_b)))
+                cv2.circle(img, (int(x_b), int(y_b)), 5, Pose.color, -1)
+                cv2.putText(img, str(Pose.kpt_names[kpt_b_id]) + " : " + str(int(x_b)) + ", " + str(int(y_b)), 
+                (int(x_b), int(y_b)), cv2.FONT_HERSHEY_PLAIN, 0.9, (255, 128, 0), 1, cv2.LINE_AA)
             if global_kpt_a_id != -1 and global_kpt_b_id != -1:
-                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 2)
+                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), 3, cv2.LINE_4)
 
 
 def get_similarity(a, b, threshold=0.5):
