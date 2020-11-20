@@ -88,12 +88,14 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
     upsample_ratio = 4
     num_keypoints = Pose.num_kpts
     previous_poses = []
+    # pre_key_point = None
     delay = 33
     # 使用 XVID 編碼
-    #fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    # fourcc = cv2.VideoWriter_fourcc(*'XVID')
     # 建立 VideoWriter 物件，輸出影片至 output.avi
     # FPS 值為 20.0，解析度為 640x360
-    #out = cv2.VideoWriter('Openpose_demo.avi', fourcc, 20.0, (640, 480))
+    # out = cv2.VideoWriter('Openpose_demo_fall2.avi', fourcc, 20.0, (640, 480))
+    
     for img in image_provider:
         start_time = time.time()
         orig_img = img.copy()
@@ -109,6 +111,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
             all_keypoints[kpt_id, 0] = (all_keypoints[kpt_id, 0] * stride / upsample_ratio - pad[1]) / scale
             all_keypoints[kpt_id, 1] = (all_keypoints[kpt_id, 1] * stride / upsample_ratio - pad[0]) / scale
         current_poses = []
+        
         for n in range(len(pose_entries)):
             if len(pose_entries[n]) == 0:
                 continue
@@ -119,11 +122,19 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
                     pose_keypoints[kpt_id, 1] = int(all_keypoints[int(pose_entries[n][kpt_id]), 1])
             pose = Pose(pose_keypoints, pose_entries[n][18])
             current_poses.append(pose)
-        # print(current_poses)
+
+            # if track_fall_down:
+            #     print(pose.keypoints[0])
+            #     pre_key_point = pose.keypoints[0]
+            #     print(pre_key_point)
+        # if previous_poses != None:
+        #     print(current_poses[0].keypoints[0])
+        #     print(previous_poses[0].keypoints[0])
 
         if track:
             track_poses(previous_poses, current_poses, smooth=smooth)
             previous_poses = current_poses
+        
         for pose in current_poses:
             pose.draw(img)
         img = cv2.addWeighted(orig_img, 0, img, 1, 0)
@@ -135,9 +146,9 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
                             cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255))
         end_time = time.time()
         cv2.putText(img, "FPS : " + str(1 / (end_time - start_time + 1e-8)) , (0, 50), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 255))
-        #out.write(img)
+        # out.write(img)
         cv2.imshow('Lightweight Human Pose Estimation Python Demo', img)
-        
+        # cv2.waitKey(0)
         key = cv2.waitKey(delay)
         if key == 27:  # esc
             return
@@ -148,7 +159,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
                 delay = 33
         elif key == 113:
             break
-    #out.release()
+    # out.release()
 
 def run_demo_image(net, image_provider, height_size, cpu, track, smooth):
     
