@@ -4,6 +4,13 @@ import random
 from modules.keypoints import BODY_PARTS_KPT_IDS, BODY_PARTS_PAF_IDS
 from modules.one_euro_filter import OneEuroFilter
 
+import winsound
+import time
+import smtplib
+# import yagmail
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 
 class Pose:
     num_kpts = 18
@@ -76,6 +83,39 @@ def get_similarity(a, b, threshold=0.5):
                 num_similar_kpt += 1
     return num_similar_kpt
 
+def get_distance(a, b):
+    x = a[0] - b[0]
+    y = a[1] - b[1]
+    point_distance = np.sqrt(x ** 2 + y ** 2)
+    return point_distance
+
+def send_email():
+    # yag_server = yagmail.SMTP(user = "a5372935@gmail.com", password = "pivextkynziigmui")
+    # email_to = ["jetmaie.fintech@gmail.com",]
+    # email_title = "Alarm ~ Fall down"
+    # email_content = "The old guy fell down"
+
+    # yag_server.send(email_to, email_title, email_content)
+    # yag_server.close()
+    with smtplib.SMTP(host="smtp.gmail.com", port="587") as smtp:  # 設定SMTP伺服器
+        try:
+            smtp = smtplib.SMTP('smtp.gmail.com', 587)
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login("a5372935@gmail.com", "pivextkynziigmui") # 登入個人的信箱(應用程式專用密碼)
+            from_address = "a5372935@gmail.com"
+            to_address = "jetmaie.fintech@gmail.com" # 目標信箱
+
+            
+            msg = MIMEMultipart()  #建立MIMEMultipart物件
+            msg["subject"] = "Alarm ~ Fall down"  #郵件標題
+            msg["from"] = from_address  #寄件者
+            msg["to"] = to_address #收件者
+            msg.attach(MIMEText("The old guy fell down"))  #郵件內容
+            smtp.send_message(msg)
+        except Exception as e:
+            print("Error message: ", e)
+    # smtp.quit()
 
 def track_poses(previous_poses, current_poses, threshold=3, smooth=False):
     """Propagate poses ids from previous frame results. Id is propagated,
@@ -102,10 +142,22 @@ def track_poses(previous_poses, current_poses, threshold=3, smooth=False):
                 best_matched_iou = iou
                 best_matched_pose_id = previous_pose.id
                 best_matched_id = id
+        if len(previous_poses) != 0:
+            Current_neck = current_poses[0].keypoints[1]
+            Previous_neck = previous_poses[0].keypoints[1]
+            Point_dis = get_distance(Current_neck, Previous_neck)
+            if(Point_dis > 50):
+                start_time = time.time()
+                # send_email()
+                # winsound.Beep(3000, 100)
+                end_time = time.time()
+                print(end_time - start_time)
+
         if best_matched_iou >= threshold:
             mask[best_matched_id] = 0
         else:  # pose not similar to any previous
             best_matched_pose_id = None
+        
         current_pose.update_id(best_matched_pose_id)
 
         if smooth:
