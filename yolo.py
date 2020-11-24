@@ -43,6 +43,7 @@ class YOLO(object):
     right = 0
     top = 0
     bottom = 0
+    is_person = False
 
     def __init__(self, **kwargs):
         self.__dict__.update(self._defaults)
@@ -155,10 +156,10 @@ class YOLO(object):
         # font = ImageFont.truetype(font='model_data/simhei.ttf',size=np.floor(3e-2 * np.shape(image)[1] + 0.5).astype('int32'))
 
         # thickness = (np.shape(image)[0] + np.shape(image)[1]) // self.model_image_size[0]
-
         for i, c in enumerate(top_label):
             predicted_class = self.class_names[c]
             if predicted_class == "person":
+                YOLO.is_person = True
                 score = top_conf[i]
 
                 top, left, bottom, right = boxes[i]
@@ -220,5 +221,7 @@ class YOLO(object):
                 #     fill=self.colors[self.class_names.index(predicted_class)])
                 # draw.text(text_origin, str(label,'UTF-8'), fill=(0, 0, 0), font=font)
                 # del draw
+            else:
+                YOLO.is_person = False
         return image
 
