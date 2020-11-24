@@ -4,7 +4,7 @@ import random
 from modules.keypoints import BODY_PARTS_KPT_IDS, BODY_PARTS_PAF_IDS
 from modules.one_euro_filter import OneEuroFilter
 import time
-
+from yolo import YOLO
 
 class Pose:
     num_kpts = 18
@@ -47,7 +47,8 @@ class Pose:
             self.id = Pose.last_id + 1
             Pose.last_id += 1
 
-    def draw(self, img):
+    def draw(self, img, img_roi_coordinate):
+        # yolo = YOLO()
         assert self.keypoints.shape == (Pose.num_kpts, 2)
 
         for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
@@ -55,11 +56,15 @@ class Pose:
             global_kpt_a_id = self.keypoints[kpt_a_id, 0]
             if global_kpt_a_id != -1:
                 x_a, y_a = self.keypoints[kpt_a_id]
+                x_a = x_a + img_roi_coordinate[0]
+                y_a = y_a + img_roi_coordinate[2]
                 cv2.circle(img, (int(x_a), int(y_a)), 5, Pose.color, -1)
             kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
             global_kpt_b_id = self.keypoints[kpt_b_id, 0]
             if global_kpt_b_id != -1:
                 x_b, y_b = self.keypoints[kpt_b_id]
+                x_b = x_b + img_roi_coordinate[0]
+                y_b = y_b + img_roi_coordinate[2]
                 # print("kpt_b_id = " + str(Pose.kpt_names[kpt_b_id]) + "; " + str(int(x_b)) + ", " + str(int(y_b)))
                 cv2.circle(img, (int(x_b), int(y_b)), 5, Pose.color, -1)
                 cv2.putText(img, str(Pose.kpt_names[kpt_b_id]) + " : " + str(int(x_b)) + ", " + str(int(y_b)), 
@@ -134,5 +139,5 @@ def track_poses(previous_poses, current_poses, threshold=3, smooth=False):
             Current_neck = current_poses[0].keypoints[1]  # 紀錄neck位置
             Previous_neck = previous_poses[0].keypoints[1]
             Point_dis = get_distance(Current_neck, Previous_neck) # 計算 neck 差值
-            
+
             return Point_dis
