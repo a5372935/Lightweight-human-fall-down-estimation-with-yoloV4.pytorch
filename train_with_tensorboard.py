@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from utils.dataloader import yolo_dataset_collate, YoloDataset
 from nets.yolo_training import YOLOLoss,Generator
 from nets.yolo4_tiny import YoloBody
+from tensorboardX import SummaryWriter
 from tqdm import tqdm
 
 def get_lr(optimizer):
@@ -37,7 +38,7 @@ def get_anchors(anchors_path):
     anchors = [float(x) for x in anchors.split(',')]
     return np.array(anchors).reshape([-1,3,2])
 
-def fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,genval,Epoch,cuda):
+def fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,genval,Epoch,cuda,writer):
     total_loss = 0
     val_loss = 0
     start_time = time.time()
@@ -62,16 +63,22 @@ def fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,genval,Epo
             loss = sum(losses)
             loss.backward()
             optimizer.step()
+            # 将loss写入tensorboard，每一步都写
+            writer.add_scalar('Train_loss', loss, (epoch*epoch_size + iteration))
 
             total_loss += loss
             waste_time = time.time() - start_time
-
+            
             pbar.set_postfix(**{'total_loss': total_loss.item() / (iteration + 1), 
                                 'lr'        : get_lr(optimizer),
                                 'step/s'    : waste_time})
             pbar.update(1)
 
             start_time = time.time()
+        
+    # 将loss写入tensorboard，下面注释的是每个世代保存一次
+    # writer.add_scalar('Train_loss', total_loss/(iteration+1), epoch)
+    
     net.eval()
     print('Start Validation')
     with tqdm(total=epoch_size_val, desc=f'Epoch {epoch + 1}/{Epoch}',postfix=dict,mininterval=0.3) as pbar:
@@ -90,26 +97,27 @@ def fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,genval,Epo
                 optimizer.zero_grad()
                 outputs = net(images_val)
                 losses = []
+
                 for i in range(2):
                     loss_item = yolo_losses[i](outputs[i], targets_val)
                     losses.append(loss_item[0])
                 loss = sum(losses)
                 val_loss += loss
+                # 将loss写入tensorboard, 下面注释的是每一步都写
+                # writer.add_scalar('Val_loss',val_loss/(epoch_size_val+1), (epoch*epoch_size_val + iteration))
+
             pbar.set_postfix(**{'total_loss': val_loss.item() / (iteration + 1)})
             pbar.update(1)
     net.train()
+    # 将loss写入tensorboard，每个世代保存一次
+    writer.add_scalar('Val_loss',val_loss/(epoch_size_val+1), epoch)
     print('Finish Validation')
-    print('Epoch:'+ str(epoch+1) + '/' + str(Epoch))
+    print('\nEpoch:'+ str(epoch+1) + '/' + str(Epoch))
     print('Total Loss: %.4f || Val Loss: %.4f ' % (total_loss/(epoch_size+1),val_loss/(epoch_size_val+1)))
 
     print('Saving state, iter:', str(epoch+1))
     torch.save(model.state_dict(), 'logs/Epoch%d-Total_Loss%.4f-Val_Loss%.4f.pth'%((epoch+1),total_loss/(epoch_size+1),val_loss/(epoch_size_val+1)))
 
-
-#----------------------------------------------------#
-#   检测精度mAP和pr曲线计算参考视频
-#   https://www.bilibili.com/video/BV1zE411u7Vw
-#----------------------------------------------------#
 if __name__ == "__main__":
     #-------------------------------#
     #   输入的shape大小
@@ -139,11 +147,9 @@ if __name__ == "__main__":
     class_names = get_classes(classes_path)
     anchors = get_anchors(anchors_path)
     num_classes = len(class_names)
+    
     # 创建模型
     model = YoloBody(len(anchors[0]),num_classes)
-    #-------------------------------------------#
-    #   权值文件的下载请看README
-    #-------------------------------------------#
     model_path = "model_data/yolov4_tiny_weights_coco.pth"
     # 加快模型训练的效率
     print('Loading weights into state dict...')
@@ -178,13 +184,13 @@ if __name__ == "__main__":
     num_val = int(len(lines)*val_split)
     num_train = len(lines) - num_val
     
-    #------------------------------------------------------#
-    #   主干特征提取网络特征通用，冻结训练可以加快训练速度
-    #   也可以在训练初期防止权值被破坏。
-    #   Init_Epoch为起始世代
-    #   Freeze_Epoch为冻结训练的世代
-    #   Epoch总训练世代
-    #------------------------------------------------------#
+    writer = SummaryWriter(log_dir='logs',flush_secs=60)
+    if Cuda:
+        graph_inputs = torch.from_numpy(np.random.rand(1,3,input_shape[0],input_shape[1])).type(torch.FloatTensor).cuda()
+    else:
+        graph_inputs = torch.from_numpy(np.random.rand(1,3,input_shape[0],input_shape[1])).type(torch.FloatTensor)
+    writer.add_graph(model, (graph_inputs,))
+
     if True:
         lr = 1e-3
         Batch_size = 16
@@ -195,14 +201,14 @@ if __name__ == "__main__":
         if Cosine_lr:
             lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5, eta_min=1e-5)
         else:
-            lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
+            lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.9)
 
         if Use_Data_Loader:
             train_dataset = YoloDataset(lines[:num_train], (input_shape[0], input_shape[1]), mosaic=mosaic)
             val_dataset = YoloDataset(lines[num_train:], (input_shape[0], input_shape[1]), mosaic=False)
-            gen = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=8, pin_memory=True,
+            gen = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
                                     drop_last=True, collate_fn=yolo_dataset_collate)
-            gen_val = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=8,pin_memory=True, 
+            gen_val = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=4,pin_memory=True, 
                                     drop_last=True, collate_fn=yolo_dataset_collate)
         else:
             gen = Generator(Batch_size, lines[:num_train],
@@ -219,7 +225,7 @@ if __name__ == "__main__":
             param.requires_grad = False
 
         for epoch in range(Init_Epoch,Freeze_Epoch):
-            fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch,Cuda)
+            fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch,Cuda,writer)
             lr_scheduler.step()
 
     if True:
@@ -232,14 +238,14 @@ if __name__ == "__main__":
         if Cosine_lr:
             lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5, eta_min=1e-5)
         else:
-            lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
+            lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.9)
 
         if Use_Data_Loader:
             train_dataset = YoloDataset(lines[:num_train], (input_shape[0], input_shape[1]), mosaic=mosaic)
             val_dataset = YoloDataset(lines[num_train:], (input_shape[0], input_shape[1]), mosaic=False)
-            gen = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=8, pin_memory=True,
+            gen = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
                                     drop_last=True, collate_fn=yolo_dataset_collate)
-            gen_val = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=8,pin_memory=True, 
+            gen_val = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=4,pin_memory=True, 
                                     drop_last=True, collate_fn=yolo_dataset_collate)
         else:
             gen = Generator(Batch_size, lines[:num_train],
@@ -256,5 +262,5 @@ if __name__ == "__main__":
             param.requires_grad = True
 
         for epoch in range(Freeze_Epoch,Unfreeze_Epoch):
-            fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,gen_val,Unfreeze_Epoch,Cuda)
+            fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,gen_val,Unfreeze_Epoch,Cuda,writer)
             lr_scheduler.step()
