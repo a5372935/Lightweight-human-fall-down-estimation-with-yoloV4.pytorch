@@ -18,6 +18,10 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from pathlib import Path
 
+from yolo import YOLO
+from PIL import Image
+
+yolo = YOLO()
 
 class ImageReader(object):
     def __init__(self, file_names):
@@ -74,8 +78,6 @@ def send_email(img_path_file = None):
             smtp.login("a5372935@gmail.com", "pivextkynziigmui") # 登入個人的信箱(應用程式專用密碼)
             from_address = "a5372935@gmail.com"
             to_address = "jetmaie.fintech@gmail.com" # 目標信箱
-
-            
             msg = MIMEMultipart()  #建立MIMEMultipart物件
             msg["subject"] = "Alarm ~ Fall down"  #郵件標題
             msg["from"] = from_address  #寄件者
@@ -90,6 +92,8 @@ def send_email(img_path_file = None):
 def infer_fast(net, img, net_input_height_size, stride, upsample_ratio, cpu,
                pad_value=(0, 0, 0), img_mean=(128, 128, 128), img_scale=1/256):
     height, width, _ = img.shape
+    print(height)
+    print(width)
     scale = net_input_height_size / height
 
     scaled_img = cv2.resize(img, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
@@ -130,65 +134,86 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
     # fourcc = cv2.VideoWriter_fourcc(*'MJPG') # XVID
     # 建立 VideoWriter 物件，輸出影片至 output.avi
     # FPS 值為 20.0，解析度為 640x360
-    # out = cv2.VideoWriter('Openpose_demo_fall.avi', fourcc, 30.0, (1280, 720))
+    # out = cv2.VideoWriter('Yolo_Openpose_demo.avi', fourcc, 30.0, (640, 480))
     
     for img in image_provider:
         start_time = time.time()
-        orig_img = img.copy()
-        heatmaps, pafs, scale, pad = infer_fast(net, img, height_size, stride, upsample_ratio, cpu)
 
-        total_keypoints_num = 0
-        all_keypoints_by_type = []
-        for kpt_idx in range(num_keypoints):  # 19th for bg
-            total_keypoints_num += extract_keypoints(heatmaps[:, :, kpt_idx], all_keypoints_by_type, total_keypoints_num)
-
-        pose_entries, all_keypoints = group_keypoints(all_keypoints_by_type, pafs, demo=True)
-        for kpt_id in range(all_keypoints.shape[0]):
-            all_keypoints[kpt_id, 0] = (all_keypoints[kpt_id, 0] * stride / upsample_ratio - pad[1]) / scale
-            all_keypoints[kpt_id, 1] = (all_keypoints[kpt_id, 1] * stride / upsample_ratio - pad[0]) / scale
-        current_poses = []
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(np.uint8(img))
         
-        for n in range(len(pose_entries)):
-            if len(pose_entries[n]) == 0:
-                continue
-            pose_keypoints = np.ones((num_keypoints, 2), dtype=np.int32) * -1
-            for kpt_id in range(num_keypoints):
-                if pose_entries[n][kpt_id] != -1.0:  # keypoint was found
-                    pose_keypoints[kpt_id, 0] = int(all_keypoints[int(pose_entries[n][kpt_id]), 0])
-                    pose_keypoints[kpt_id, 1] = int(all_keypoints[int(pose_entries[n][kpt_id]), 1])
-            pose = Pose(pose_keypoints, pose_entries[n][18])
-            current_poses.append(pose)
+        img = np.array(yolo.detect_image(img))
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-        if track:
-            Point_dis = track_poses(previous_poses, current_poses, smooth = smooth)
-            # print(Point_dis)
-            if(Point_dis != None and Point_dis > 25): # 當大於 25 pixel && 警報為 true 執行發送email通知
-                if(Pose.Fall_alarm == 1):
-                    img_fall_file = "./Fall_img.jpg"
-                    cv2.imwrite(img_fall_file, img)
-                    Pose.Fall_alarm = -1
-                    p = threading.Thread(target=send_email, args = (img_fall_file, )) # 以執行緒同步發送email
-                    p.start()
-                print(time.time() - Pose.S_time)
-                if(time.time() - Pose.S_time > 30):
-                    Pose.Fall_alarm = 1
-                    Pose.S_time = time.time()
-            previous_poses = current_poses
-        
-        for pose in current_poses:
-            pose.draw(img)
-        img = cv2.addWeighted(orig_img, 0, img, 1, 0)
-        for pose in current_poses:
-            cv2.rectangle(img, (pose.bbox[0], pose.bbox[1]),
-                          (pose.bbox[0] + pose.bbox[2], pose.bbox[1] + pose.bbox[3]), (0, 255, 0))
+        if(yolo.is_person != True):
+            end_time = time.time()
+            cv2.putText(img, "FPS : " + str(1 / (end_time - start_time + 1e-8)) , (0, 50), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 255))
+            cv2.imshow("Lightweight Human Pose Estimation Python Demo",img)
+        else:
+            x_left = yolo.left
+            x_right = yolo.right
+            y_top = yolo.top
+            y_bottom = yolo.bottom
+
+            img_roi = [x_left, x_right, y_top, y_bottom]
+
+            # img_crop = img[yolo.top : yolo.bottom, yolo.left : yolo.right]
+            img_crop = img[y_top : y_bottom, x_left : x_right]
+            # orig_img = img.copy()
+            heatmaps, pafs, scale, pad = infer_fast(net, img_crop, height_size, stride, upsample_ratio, cpu)
+
+            total_keypoints_num = 0
+            all_keypoints_by_type = []
+            for kpt_idx in range(num_keypoints):  # 19th for bg
+                total_keypoints_num += extract_keypoints(heatmaps[:, :, kpt_idx], all_keypoints_by_type, total_keypoints_num)
+
+            pose_entries, all_keypoints = group_keypoints(all_keypoints_by_type, pafs, demo=True)
+            for kpt_id in range(all_keypoints.shape[0]):
+                all_keypoints[kpt_id, 0] = (all_keypoints[kpt_id, 0] * stride / upsample_ratio - pad[1]) / scale
+                all_keypoints[kpt_id, 1] = (all_keypoints[kpt_id, 1] * stride / upsample_ratio - pad[0]) / scale
+            current_poses = []
+            
+            for n in range(len(pose_entries)):
+                if len(pose_entries[n]) == 0:
+                    continue
+                pose_keypoints = np.ones((num_keypoints, 2), dtype=np.int32) * -1
+                for kpt_id in range(num_keypoints):
+                    if pose_entries[n][kpt_id] != -1.0:  # keypoint was found
+                        pose_keypoints[kpt_id, 0] = int(all_keypoints[int(pose_entries[n][kpt_id]), 0])
+                        pose_keypoints[kpt_id, 1] = int(all_keypoints[int(pose_entries[n][kpt_id]), 1])
+                pose = Pose(pose_keypoints, pose_entries[n][18])
+                current_poses.append(pose)
+
             if track:
-                cv2.putText(img, 'id: {}'.format(pose.id), (pose.bbox[0], pose.bbox[1] - 16),
-                            cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255))
-        end_time = time.time()
-        cv2.putText(img, "FPS : " + str(1 / (end_time - start_time + 1e-8)) , (0, 50), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 255))
-        # out.write(img)
-        cv2.imshow('Lightweight Human Pose Estimation Python Demo', img)
-        # cv2.waitKey(0)
+                Point_dis = track_poses(previous_poses, current_poses, smooth = smooth)
+                # print(Point_dis)
+                if(Point_dis != None and Point_dis > 25): # 當大於 25 pixel && 警報為 true 執行發送email通知
+                    if(Pose.Fall_alarm == 1):
+                        img_fall_file = "./Fall_img.jpg"
+                        cv2.imwrite(img_fall_file, img)
+                        Pose.Fall_alarm = -1
+                        p = threading.Thread(target=send_email, args = (img_fall_file, )) # 以執行緒同步發送email
+                        p.start()
+                    print(time.time() - Pose.S_time)
+                    if(time.time() - Pose.S_time > 30):
+                        Pose.Fall_alarm = 1
+                        Pose.S_time = time.time()
+                previous_poses = current_poses
+            
+            for pose in current_poses:
+                pose.draw(img, img_roi)
+            # img = cv2.addWeighted(orig_img, 0, img, 1, 0)
+            # for pose in current_poses:
+                # cv2.rectangle(img, (pose.bbox[0], pose.bbox[1]),
+                #               (pose.bbox[0] + pose.bbox[2], pose.bbox[1] + pose.bbox[3]), (0, 255, 0))
+                # if track:
+                #     cv2.putText(img, 'id: {}'.format(pose.id), (pose.bbox[0], pose.bbox[1] - 16),
+                #                 cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255))
+            end_time = time.time()
+            cv2.putText(img, "FPS : " + str(1 / (end_time - start_time + 1e-8)) , (0, 50), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 255))
+            # out.write(img)
+            cv2.imshow("Lightweight Human Pose Estimation Python Demo", img)
+            # cv2.waitKey(0)
         key = cv2.waitKey(delay)
         if key == 27:  # esc
             return
