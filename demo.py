@@ -87,16 +87,17 @@ def send_email(img_path_file = None):
             smtp.send_message(msg)
         except Exception as e:
             print("Error message: ", e)
+            pass
     # smtp.quit()
 
 def infer_fast(net, img, net_input_height_size, stride, upsample_ratio, cpu,
-               pad_value=(0, 0, 0), img_mean=(128, 128, 128), img_scale=1/256):
+               pad_value=(0, 0, 0), img_mean=np.array([128, 128, 128], np.float32), img_scale=np.float32(1/256)):
     height, width, _ = img.shape
-    print(height)
-    print(width)
+    # print(height)
+    # print(width)
     scale = net_input_height_size / height
 
-    scaled_img = cv2.resize(img, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    scaled_img = cv2.resize(img, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
     scaled_img = normalize(scaled_img, img_mean, img_scale)
     min_dims = [net_input_height_size, max(scaled_img.shape[1], net_input_height_size)]
     padded_img, pad = pad_width(scaled_img, stride, pad_value, min_dims)
@@ -129,7 +130,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
     num_keypoints = Pose.num_kpts
     previous_poses = []
     # pre_key_point = None
-    delay = 33
+    delay = 1
     # 使用 XVID 編碼
     # fourcc = cv2.VideoWriter_fourcc(*'MJPG') # XVID
     # 建立 VideoWriter 物件，輸出影片至 output.avi
@@ -141,33 +142,47 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(np.uint8(img))
-        
         img = np.array(yolo.detect_image(img))
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        img_background = np.zeros([img.shape[0], img.shape[1], 3],dtype=np.uint8) # generate one empty image for background
 
         if(yolo.is_person != True):
             end_time = time.time()
             cv2.putText(img, "FPS : " + str(1 / (end_time - start_time + 1e-8)) , (0, 50), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 255))
             cv2.imshow("Lightweight Human Pose Estimation Python Demo",img)
         else:
-            x_left = yolo.left
-            x_right = yolo.right
-            y_top = yolo.top
-            y_bottom = yolo.bottom
+            for i in yolo.person_boxes:
+                # print(i)
+                y_top, x_left, y_bottom, x_right = i
+                
+                y_top = max(0, np.floor(y_top + 0.5).astype('int32'))
+                x_left = max(0, np.floor(x_left + 0.5).astype('int32'))
+                y_bottom = min(img.shape[0], np.floor(y_bottom + 0.5).astype('int32'))
+                x_right = min(img.shape[1], np.floor(x_right + 0.5).astype('int32'))
 
-            img_roi = [x_left, x_right, y_top, y_bottom]
+                img_background[y_top : y_bottom, x_left : x_right] = img[y_top : y_bottom, x_left : x_right]
+            # cv2.imshow("re", img_background)
+
+            # x_left = yolo.left
+            # x_right = yolo.right
+            # y_top = yolo.top
+            # y_bottom = yolo.bottom
+
+            # img_roi = [x_left, x_right, y_top, y_bottom]
+            # print(img_roi)
 
             # img_crop = img[yolo.top : yolo.bottom, yolo.left : yolo.right]
-            img_crop = img[y_top : y_bottom, x_left : x_right]
+            # img_crop = img[y_top : y_bottom, x_left : x_right]
             # orig_img = img.copy()
-            heatmaps, pafs, scale, pad = infer_fast(net, img_crop, height_size, stride, upsample_ratio, cpu)
+            heatmaps, pafs, scale, pad = infer_fast(net, img_background, height_size, stride, upsample_ratio, cpu)
 
             total_keypoints_num = 0
             all_keypoints_by_type = []
             for kpt_idx in range(num_keypoints):  # 19th for bg
                 total_keypoints_num += extract_keypoints(heatmaps[:, :, kpt_idx], all_keypoints_by_type, total_keypoints_num)
 
-            pose_entries, all_keypoints = group_keypoints(all_keypoints_by_type, pafs, demo=True)
+            pose_entries, all_keypoints = group_keypoints(all_keypoints_by_type, pafs)
             for kpt_id in range(all_keypoints.shape[0]):
                 all_keypoints[kpt_id, 0] = (all_keypoints[kpt_id, 0] * stride / upsample_ratio - pad[1]) / scale
                 all_keypoints[kpt_id, 1] = (all_keypoints[kpt_id, 1] * stride / upsample_ratio - pad[0]) / scale
@@ -185,23 +200,23 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
                 current_poses.append(pose)
 
             if track:
-                Point_dis = track_poses(previous_poses, current_poses, smooth = smooth)
+                Point_dis = track_poses(previous_poses, current_poses, smooth = smooth) # return numbers of variance distance
                 # print(Point_dis)
-                if(Point_dis != None and Point_dis > 25): # 當大於 25 pixel && 警報為 true 執行發送email通知
+                if(Point_dis != None and np.max(Point_dis) > 50): # 當大於 50 pixel && 警報為 true 執行發送email通知
                     if(Pose.Fall_alarm == 1):
                         img_fall_file = "./Fall_img.jpg"
                         cv2.imwrite(img_fall_file, img)
                         Pose.Fall_alarm = -1
                         p = threading.Thread(target=send_email, args = (img_fall_file, )) # 以執行緒同步發送email
                         p.start()
-                    print(time.time() - Pose.S_time)
-                    if(time.time() - Pose.S_time > 30):
+                    # print(time.time() - Pose.S_time)
+                    if(time.time() - Pose.S_time > 30): # alerm 與 alerm 的間格30秒
                         Pose.Fall_alarm = 1
                         Pose.S_time = time.time()
                 previous_poses = current_poses
             
             for pose in current_poses:
-                pose.draw(img, img_roi)
+                pose.draw(img)
             # img = cv2.addWeighted(orig_img, 0, img, 1, 0)
             # for pose in current_poses:
                 # cv2.rectangle(img, (pose.bbox[0], pose.bbox[1]),
@@ -218,10 +233,10 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
         if key == 27:  # esc
             return
         elif key == 112:  # 'p'
-            if delay == 33:
+            if delay == 1:
                 delay = 0
             else:
-                delay = 33
+                delay = 1
         elif key == 113:
             break
     # out.release()

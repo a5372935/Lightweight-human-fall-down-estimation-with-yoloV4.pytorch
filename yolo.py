@@ -39,10 +39,11 @@ class YOLO(object):
     #   初始化YOLO
     #---------------------------------------------------#
 
-    left = 0
-    right = 0
-    top = 0
-    bottom = 0
+    # left = 0
+    # right = 0
+    # top = 0
+    # bottom = 0
+    person_boxes = []
     is_person = False
 
     def __init__(self, **kwargs):
@@ -162,6 +163,9 @@ class YOLO(object):
                 YOLO.is_person = True
                 score = top_conf[i]
 
+                # print(boxes)
+                YOLO.person_boxes = boxes
+
                 top, left, bottom, right = boxes[i]
                 top = top - 5
                 left = left - 5
@@ -173,10 +177,10 @@ class YOLO(object):
                 bottom = min(np.shape(image)[0], np.floor(bottom + 0.5).astype('int32'))
                 right = min(np.shape(image)[1], np.floor(right + 0.5).astype('int32'))
 
-                YOLO.left = left
-                YOLO.top = top
-                YOLO.right = right
-                YOLO.bottom = bottom
+                # YOLO.left = left
+                # YOLO.top = top
+                # YOLO.right = right
+                # YOLO.bottom = bottom
 
                 # print("top : " + str(top))
                 # print("left : " + str(left))
@@ -189,7 +193,7 @@ class YOLO(object):
                 # draw = ImageDraw.Draw(image)
                 # label_size = draw.textsize(label, font)
                 # label = label.encode('utf-8')
-                print(label)
+                # print(label)
                 # cv2.circle(image, (left, top), 5, (255, 0, 0), -1)
 
                 # if top - label_size[1] >= 0:
