@@ -2,6 +2,9 @@
 
 My project focuses on providing a solution to detect human falls in real time and to send a warning message during the fall, rather than the result of the fall.
 
+human sameple, not fall down
+![human sameple](https://github.com/a5372935/lightweight-human-pose-estimation-with-yoloV4.pytorch/blob/master/img/Catch_img.jpg)
+
 # 2020/12/26 Modified by [YOU-JEN SHIEH](https://github.com/a5372935)
 
 ## Environment
