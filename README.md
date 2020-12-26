@@ -12,11 +12,12 @@ My project focuses on providing a solution to detect human falls in real time an
 
 We provide python demo just for the quick results preview. Please, consider c++ demo for the best performance. To run the python demo from a webcam:
 * `python demo.py --checkpoint-path <path_to>/checkpoint_iter_370000.pth --video 0`
-* `python demo.py --checkpoint-path <path_to>/checkpoint_iter_370000.pth --video <video path>`
+* `python demo.py --checkpoint-path <path_to>/checkpoint_iter_370000.pth --video <video_path>`
 
 ## IF you want send alarm-email when the human fall 
 Please uncomment lines 205 to 215 of demo.py & Modified your email, target email, app password in line 78 & 79
 
 ## Reference
+### If you want retrain model please refer here
 * Lightweight OpenPose : [Daniil-Osokin](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation.pytorch)
 * yolov4-tiny-pytorch : [Bubbliiiing](https://github.com/bubbliiiing/yolov4-tiny-pytorc)
