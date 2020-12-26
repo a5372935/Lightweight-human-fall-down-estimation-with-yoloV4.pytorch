@@ -15,7 +15,7 @@ My project focuses on providing a solution to detect human falls in real time an
 
 ## Python Demo <a name="python-demo"/>
 
-We provide python demo just for the quick results preview. Please, consider c++ demo refer [Lightweight OpenPose](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation.pytorch) for the best performance. To run the python demo from a webcam or videos:
+We provide python demo just for the quick results preview. Please, consider c++ demo refer [Lightweight OpenPose](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation.pytorch) for the **best performance**. To run the python demo from a webcam or videos:
 * `python demo.py --checkpoint-path <path_to>/checkpoint_iter_370000.pth --video 0`
 * `python demo.py --checkpoint-path <path_to>/checkpoint_iter_370000.pth --video <video_path>`
 
