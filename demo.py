@@ -77,7 +77,7 @@ def send_email(img_path_file = None):
             smtp.starttls()
             smtp.login("your email", "password for app program") # 登入個人的信箱(應用程式專用密碼)
             from_address = "your email"
-            to_address = "target email"" # 目標信箱
+            to_address = "target email" # 目標信箱
             msg = MIMEMultipart()  #建立MIMEMultipart物件
             msg["subject"] = "Alarm ~ Fall down"  #郵件標題
             msg["from"] = from_address  #寄件者
