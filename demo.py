@@ -75,9 +75,9 @@ def send_email(img_path_file = None):
             smtp = smtplib.SMTP('smtp.gmail.com', 587)
             smtp.ehlo()
             smtp.starttls()
-            smtp.login("a5372935@gmail.com", "pivextkynziigmui") # 登入個人的信箱(應用程式專用密碼)
-            from_address = "a5372935@gmail.com"
-            to_address = "jetmaie.fintech@gmail.com" # 目標信箱
+            smtp.login("your email", "password for app program") # 登入個人的信箱(應用程式專用密碼)
+            from_address = "your email"
+            to_address = "target email"" # 目標信箱
             msg = MIMEMultipart()  #建立MIMEMultipart物件
             msg["subject"] = "Alarm ~ Fall down"  #郵件標題
             msg["from"] = from_address  #寄件者
@@ -202,17 +202,17 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
             if track:
                 Point_dis = track_poses(previous_poses, current_poses, smooth = smooth) # return numbers of variance distance
                 # print(Point_dis)
-                if(Point_dis != None and np.max(Point_dis) > 50): # 當大於 50 pixel && 警報為 true 執行發送email通知
-                    if(Pose.Fall_alarm == 1):
-                        img_fall_file = "./Fall_img.jpg"
-                        cv2.imwrite(img_fall_file, img)
-                        Pose.Fall_alarm = -1
-                        p = threading.Thread(target=send_email, args = (img_fall_file, )) # 以執行緒同步發送email
-                        p.start()
-                    # print(time.time() - Pose.S_time)
-                    if(time.time() - Pose.S_time > 30): # alerm 與 alerm 的間格30秒
-                        Pose.Fall_alarm = 1
-                        Pose.S_time = time.time()
+                # if(Point_dis != None and np.max(Point_dis) > 50): # 當大於 50 pixel && 警報為 true 執行發送email通知
+                #     if(Pose.Fall_alarm == 1):
+                #         img_fall_file = "./Fall_img.jpg"
+                #         cv2.imwrite(img_fall_file, img)
+                #         Pose.Fall_alarm = -1
+                #         p = threading.Thread(target=send_email, args = (img_fall_file, )) # 以執行緒同步發送email
+                #         p.start()
+                #     # print(time.time() - Pose.S_time)
+                #     if(time.time() - Pose.S_time > 30): # alerm 與 alerm 的間格30秒
+                #         Pose.Fall_alarm = 1
+                #         Pose.S_time = time.time()
                 previous_poses = current_poses
             
             for pose in current_poses:
