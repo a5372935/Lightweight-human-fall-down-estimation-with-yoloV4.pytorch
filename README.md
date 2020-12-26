@@ -28,4 +28,4 @@ Please uncomment lines 205 to 215 of demo.py & Modified your email, target email
 ## Reference
 ### If you want retrain model please refer here
 * Lightweight OpenPose : [Daniil-Osokin](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation.pytorch)
-* yolov4-tiny-pytorch : [Bubbliiiing](https://github.com/bubbliiiing/yolov4-tiny-pytorc)
+* yolov4-tiny-pytorch : [Bubbliiiing](https://github.com/bubbliiiing/yolov4-tiny-pytorch)
