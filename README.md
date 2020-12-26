@@ -4,6 +4,11 @@ My project focuses on providing a solution to detect human falls in real time an
 
 # 2020/12/26 Modified by [YOU-JEN SHIEH](https://github.com/a5372935)
 
+## Environment
+* windows10, python 3.6.10, torch 1.4 
+* CPU : i5-9400f , CPU usage up to 100%
+* GPU : GTX1650 , GPU only use 1G RAM
+
 ## Download weights
 * Pre-trained on COCO model is available at: [checkpoint_iter_370000.pth](https://download.01.org/opencv/openvino_training_extensions/models/human_pose_estimation/checkpoint_iter_370000.pth), it has 40% of AP on COCO validation set (38.6% of AP on the val *subset*)
 * Pre-trained on COCO-Train2017 [yolov4_tiny_weights_coco.pth](https://github.com/bubbliiiing/yolov4-tiny-pytorch/releases/download/v1.0/yolov4_tiny_weights_coco.pth) and move it to model_data, image input size 416 * 416 
